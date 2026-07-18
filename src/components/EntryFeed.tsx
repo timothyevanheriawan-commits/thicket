@@ -114,12 +114,6 @@ export default function EntryFeed({
     setEditingId(null);
   }
 
-  // Shared by both delete entry points (desktop tap-to-confirm and mobile
-  // swipe). onDeleteEntry already does the optimistic removal + grace-period
-  // delay internally (see useEntries.ts), so this just needs to trigger it
-  // and surface an Undo toast for the same window. The toast duration is
-  // intentionally tied to DELETE_GRACE_PERIOD_MS rather than hardcoded, so
-  // the Undo action can't outlive the point where it stops actually working.
   async function triggerDelete(entry: Entry) {
     await onDeleteEntry(entry.id);
     toast(`"${entry.label}" deleted`, {
@@ -159,8 +153,7 @@ export default function EntryFeed({
           transition={{ type: "spring", stiffness: 420, damping: 30 }}
           className="flex flex-col gap-3"
         >
-          {/* Search & filter bar — sticky while scrolling the feed */}
-          <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-2 bg-bg/95 px-1 py-2 backdrop-blur-sm">
+          <div className="sticky top-0 z-20 -mx-1 flex flex-col gap-2 bg-bg/95 px-1 py-2 backdrop-blur-sm">
             <div className="relative">
               <Search
                 size={14}

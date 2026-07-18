@@ -252,7 +252,7 @@ export default function EntryRow({
         dragConstraints={{ left: -140, right: 0 }}
         dragElastic={{ left: 0.08, right: 0 }}
         onDragEnd={handleSwipeDragEnd}
-        className={`group flex items-start justify-between rounded-xl px-4 py-2.5 transition-colors ${
+        className={`group relative z-10 flex items-start justify-between rounded-xl px-4 py-2.5 transition-colors ${
           isMobile ? "bg-surface" : "bg-surface/60 hover:bg-surface"
         } ${entry.pinned ? "ring-1 ring-clay/40" : ""}`}
       >
