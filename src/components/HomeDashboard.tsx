@@ -3,15 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { X, Settings as SettingsIcon } from "lucide-react";
+import { X, Settings as SettingsIcon, ArrowUp, ArrowDown } from "lucide-react";
 import CategoryChart from "@/components/CategoryChart";
 import TaskWidget from "@/components/TaskWidget";
 import QuickAddForm from "@/components/QuickAddForm";
 import QuickAddFab from "@/components/QuickAddFab";
 import EntryFeed from "@/components/EntryFeed";
-import { formatIDR, formatDueLabel, isThisWeek } from "@/lib/format";
+import {
+  formatIDR,
+  formatDueLabel,
+  isThisWeek,
+  isLastWeek,
+} from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import { useCategories } from "@/lib/hooks/useCategories";
+import { useCurrencyFormat } from "@/lib/hooks/useCurrencyFormat";
 import {
   useEntries,
   type Category,
@@ -41,6 +47,8 @@ export default function HomeDashboard() {
     error: categoryError,
     clearError: clearCategoryError,
   } = useCategories();
+
+  const { format: currencyFormat } = useCurrencyFormat();
 
   const [type, setType] = useState<EntryType>("expense");
   const [category, setCategory] = useState<Category>("Food");
@@ -97,6 +105,23 @@ export default function HomeDashboard() {
       .reduce((sum, e) => sum + (e.amount ?? 0), 0);
   }, [entries]);
 
+  const lastWeekTotal = useMemo(() => {
+    return entries
+      .filter(
+        (e) => e.type === "expense" && e.amount && isLastWeek(e.createdAt),
+      )
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+  }, [entries]);
+
+  // Percent change vs. last week. Only meaningful when last week actually
+  // had spend to compare against — with lastWeekTotal at 0, any percentage
+  // would be either undefined (0/0) or a misleading "Infinity%" (n/0), so
+  // the delta is simply not shown in that case rather than faked.
+  const weeklyDeltaPercent =
+    lastWeekTotal > 0
+      ? Math.round(((weeklyTotal - lastWeekTotal) / lastWeekTotal) * 100)
+      : null;
+
   // Count-up animation for the header total: a MotionValue is bound
   // directly as the child of a motion.span below, so Framer Motion updates
   // the text content imperatively on every animation frame without
@@ -104,7 +129,7 @@ export default function HomeDashboard() {
   // everywhere else in the app.
   const weeklyTotalMotion = useMotionValue(0);
   const weeklyTotalDisplay = useTransform(weeklyTotalMotion, (v) =>
-    formatIDR(Math.round(v)),
+    formatIDR(Math.round(v), currencyFormat),
   );
 
   useEffect(() => {
@@ -208,9 +233,25 @@ export default function HomeDashboard() {
           <h1 className="font-display text-3xl font-medium tracking-tight text-sage-deep">
             Thicket
           </h1>
-          <p className="mt-1 text-sm text-brown/60">
-            This week &middot; <motion.span>{weeklyTotalDisplay}</motion.span>{" "}
-            spent
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-brown/60">
+            <span>
+              This week &middot; <motion.span>{weeklyTotalDisplay}</motion.span>{" "}
+              spent
+            </span>
+            {weeklyDeltaPercent !== null && weeklyDeltaPercent !== 0 && (
+              <span
+                className={`flex items-center gap-0.5 text-xs font-medium ${
+                  weeklyDeltaPercent > 0 ? "text-clay" : "text-sage-deep"
+                }`}
+              >
+                {weeklyDeltaPercent > 0 ? (
+                  <ArrowUp size={11} strokeWidth={2.5} />
+                ) : (
+                  <ArrowDown size={11} strokeWidth={2.5} />
+                )}
+                {Math.abs(weeklyDeltaPercent)}%
+              </span>
+            )}
           </p>
         </div>
         <Link
@@ -311,6 +352,7 @@ export default function HomeDashboard() {
               entries={entries}
               categories={allCategories}
               justAddedId={justAddedId}
+              currencyFormat={currencyFormat}
               onToggleTask={toggleTask}
               onTogglePin={togglePin}
               onEditEntry={editEntry}

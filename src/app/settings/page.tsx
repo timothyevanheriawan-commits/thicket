@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Eye, EyeOff, LogOut, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useCurrencyFormat } from "@/lib/hooks/useCurrencyFormat";
+import { formatIDR, type CurrencyFormat } from "@/lib/format";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -27,6 +29,9 @@ export default function SettingsPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<Status>("idle");
   const [deleteError, setDeleteError] = useState("");
+
+  const { format: currencyFormat, setFormat: setCurrencyFormat } =
+    useCurrencyFormat();
 
   useEffect(() => {
     async function loadUser() {
@@ -180,6 +185,37 @@ export default function SettingsPage() {
               </motion.p>
             )}
           </AnimatePresence>
+        </div>
+
+        {/* Currency format */}
+        <div className="rounded-[var(--radius-soft)] bg-surface p-4 shadow-sm">
+          <h2 className="font-display text-sm font-medium text-brown">
+            Currency format
+          </h2>
+          <div className="mt-2.5 flex gap-2">
+            {(
+              [
+                { value: "standard", label: "Standard" },
+                { value: "comma", label: "Comma" },
+                { value: "compact", label: "Compact" },
+              ] as { value: CurrencyFormat; label: string }[]
+            ).map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setCurrencyFormat(option.value)}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  currencyFormat === option.value
+                    ? "bg-sage text-bg"
+                    : "bg-bg text-brown/60"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-brown/50">
+            Preview: {formatIDR(1226000, currencyFormat)}
+          </p>
         </div>
 
         {/* Change password */}

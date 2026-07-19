@@ -7,7 +7,7 @@ import EntryRow from "@/components/EntryRow";
 import LeafTrio from "@/components/icons/LeafTrio";
 import { useToast } from "@/components/Toast";
 import { toLocalISODate } from "@/lib/dateUtils";
-import { formatDayLabel } from "@/lib/format";
+import { formatDayLabel, type CurrencyFormat } from "@/lib/format";
 import {
   DELETE_GRACE_PERIOD_MS,
   type Category,
@@ -19,6 +19,7 @@ type EntryFeedProps = {
   entries: Entry[];
   categories: Category[];
   justAddedId: string | null;
+  currencyFormat?: CurrencyFormat;
   onToggleTask: (id: string) => void;
   onTogglePin: (id: string) => void;
   onEditEntry: (
@@ -34,6 +35,7 @@ export default function EntryFeed({
   entries,
   categories,
   justAddedId,
+  currencyFormat,
   onToggleTask,
   onTogglePin,
   onEditEntry,
@@ -279,6 +281,7 @@ export default function EntryFeed({
                         >
                           <EntryRow
                             entry={entry}
+                            currencyFormat={currencyFormat}
                             isEditing={editingId === entry.id}
                             isConfirmingDelete={confirmDeleteId === entry.id}
                             isJustAdded={entry.id === justAddedId}

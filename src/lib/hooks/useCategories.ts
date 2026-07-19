@@ -37,6 +37,12 @@ export function useCategories() {
 
     async function load() {
       setLoading(true);
+
+      // Same race as useEntries.ts's load(): wait for createBrowserClient's
+      // own async session hydration before querying, so this can't fire
+      // unauthenticated right after a hard-navigation login.
+      await supabase.auth.getSession();
+
       const { data, error } = await supabase
         .from("categories")
         .select("id, name")

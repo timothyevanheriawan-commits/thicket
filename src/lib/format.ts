@@ -1,4 +1,25 @@
-export function formatIDR(amount: number) {
+export type CurrencyFormat = "standard" | "comma" | "compact";
+
+export function formatIDR(amount: number, format: CurrencyFormat = "standard") {
+  if (format === "comma") {
+    // Same digits as "standard", comma thousands separator instead of
+    // period — for people more used to US-style grouping.
+    return `Rp ${amount.toLocaleString("en-US")}`;
+  }
+
+  if (format === "compact") {
+    if (amount >= 1_000_000) {
+      const millions = amount / 1_000_000;
+      const trimmed =
+        millions % 1 === 0 ? millions.toString() : millions.toFixed(1);
+      return `Rp ${trimmed}jt`;
+    }
+    if (amount >= 1_000) {
+      return `Rp ${Math.round(amount / 1000)}k`;
+    }
+    return `Rp ${amount}`;
+  }
+
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
@@ -11,6 +32,18 @@ export function isThisWeek(date: Date) {
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(now.getDate() - 7);
   return date >= sevenDaysAgo && date <= now;
+}
+
+// The 7-day window immediately preceding isThisWeek's rolling window, used
+// for week-over-week comparisons. Kept as a trailing window (not calendar
+// Mon-Sun) to stay consistent with isThisWeek's own definition above.
+export function isLastWeek(date: Date) {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  const fourteenDaysAgo = new Date(now);
+  fourteenDaysAgo.setDate(now.getDate() - 14);
+  return date >= fourteenDaysAgo && date < sevenDaysAgo;
 }
 
 export function formatRelativeTime(date: Date): string {

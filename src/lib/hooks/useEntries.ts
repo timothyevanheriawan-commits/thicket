@@ -79,6 +79,18 @@ export function useEntries() {
 
     async function load() {
       setLoading(true);
+
+      // Wait for the browser client's own session hydration to finish
+      // before querying. middleware.ts validates the session server-side
+      // to allow this page to render at all, but createBrowserClient does
+      // its own separate, async read of the session from cookies on the
+      // client. Right after a hard-navigation login, this effect can fire
+      // before that finishes — the query then goes out effectively
+      // unauthenticated, RLS silently returns zero rows (no error), and
+      // the feed looks empty until a manual refresh. getSession() awaits
+      // that same internal hydration without an extra network round trip.
+      await supabase.auth.getSession();
+
       const { data, error } = await supabase
         .from("entries")
         .select("*")

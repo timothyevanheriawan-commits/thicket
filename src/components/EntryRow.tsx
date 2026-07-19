@@ -17,11 +17,18 @@ import {
   Pin,
   MoreHorizontal,
 } from "lucide-react";
-import { formatIDR, formatRelativeTime, formatDueLabel } from "@/lib/format";
+import {
+  formatIDR,
+  formatRelativeTime,
+  formatDueLabel,
+  type CurrencyFormat,
+} from "@/lib/format";
+import { getCategoryColor } from "@/lib/constants";
 import type { Entry } from "@/lib/hooks/useEntries";
 
 type EntryRowProps = {
   entry: Entry;
+  currencyFormat?: CurrencyFormat;
   isEditing: boolean;
   isConfirmingDelete: boolean;
   isJustAdded: boolean;
@@ -76,6 +83,7 @@ function getMobileServerSnapshot() {
 
 export default function EntryRow({
   entry,
+  currencyFormat,
   isEditing,
   isConfirmingDelete,
   isJustAdded,
@@ -257,17 +265,22 @@ export default function EntryRow({
         } ${entry.pinned ? "ring-1 ring-clay/40" : ""}`}
       >
         <div className="flex min-w-0 items-start gap-3">
-          {entry.type === "task" ? (
-            <button
-              onClick={onToggleTask}
-              className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-sage transition-colors ${
-                entry.done ? "bg-sage" : "bg-transparent"
-              }`}
-              aria-label="Toggle task done"
-            />
-          ) : (
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-clay" />
-          )}
+          <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+            {entry.type === "task" ? (
+              <button
+                onClick={onToggleTask}
+                className={`h-3 w-3 rounded-full border-[1.5px] border-sage transition-colors ${
+                  entry.done ? "bg-sage" : "bg-transparent"
+                }`}
+                aria-label="Toggle task done"
+              />
+            ) : (
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: getCategoryColor(entry.category) }}
+              />
+            )}
+          </div>
           <div className="min-w-0">
             <p
               className={`truncate text-sm ${
@@ -300,7 +313,7 @@ export default function EntryRow({
         <div className="flex shrink-0 items-start gap-1.5">
           {entry.amount !== undefined && (
             <span className="mr-1 mt-0.5 text-sm font-medium text-brown/70">
-              {formatIDR(entry.amount)}
+              {formatIDR(entry.amount, currencyFormat)}
             </span>
           )}
 
