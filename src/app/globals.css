@@ -28,13 +28,23 @@
 
 body {
   background-color: var(--bg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%238a9a7e' stroke-width='1.1' stroke-linecap='round' opacity='0.16'%3E%3Cpath d='M20 24c8-10 20-10 26-2'/%3E%3Cpath d='M20 24c2 6 8 10 15 9'/%3E%3Cpath d='M100 90c8-9 19-8 24 0'/%3E%3Cpath d='M100 90c1 6 7 10 14 8'/%3E%3Ccircle cx='60' cy='118' r='2.2'/%3E%3Ccircle cx='118' cy='30' r='2.2'/%3E%3Ccircle cx='12' cy='95' r='1.6'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 140px 140px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%238a9a7e' stroke-width='1.1' stroke-linecap='round' opacity='0.18'%3E%3Cpath d='M20 24c8-10 20-10 26-2'/%3E%3Cpath d='M20 24c2 6 8 10 15 9'/%3E%3Cpath d='M140 120c8-9 19-8 24 0'/%3E%3Cpath d='M140 120c1 6 7 10 14 8'/%3E%3Cpath d='M60 150c6-7 15-6 19 1'/%3E%3Cpath d='M150 40c-7 3-11 11-8 18'/%3E%3Ccircle cx='60' cy='118' r='2.2'/%3E%3Ccircle cx='158' cy='30' r='2.2'/%3E%3Ccircle cx='12' cy='95' r='1.6'/%3E%3Ccircle cx='100' cy='60' r='1.8'/%3E%3Ccircle cx='30' cy='160' r='1.4'/%3E%3Cpath d='M90 20 L94 28 L86 28 Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 180px 180px;
   color: var(--brown);
   font-family: var(--font-sans);
 }
 
 
+
+/* Keyboard-focus indicator for every interactive element. Elements that
+   already define their own focus ring (inputs use focus:ring-2 via
+   focus:outline-none) override this via higher specificity, so this
+   exists purely to cover buttons, links, and chips that otherwise have
+   no visible focus state at all. */
+:focus-visible {
+  outline: 2px solid var(--sage-deep);
+  outline-offset: 2px;
+}
 
 @keyframes leaf-settle {
   0% {

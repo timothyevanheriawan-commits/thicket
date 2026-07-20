@@ -40,7 +40,7 @@ export default function TaskWidget({
   onTogglePin: (id: string) => void;
 }) {
   return (
-    <div className="rounded-[var(--radius-soft)] bg-surface p-4 shadow-sm">
+    <div className="rounded-soft bg-surface p-4 shadow-sm">
       <AnimatePresence mode="wait" initial={false}>
         {tasks.length === 0 ? (
           <motion.div

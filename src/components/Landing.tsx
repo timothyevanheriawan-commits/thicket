@@ -80,7 +80,7 @@ export default function Landing() {
         variants={fadeUp}
         className="mt-20 grid grid-cols-1 gap-4 md:mt-28 md:grid-cols-2"
       >
-        <div className="rounded-[var(--radius-soft)] bg-surface p-5 shadow-sm">
+        <div className="rounded-soft bg-surface p-5 shadow-sm">
           <p className="font-display text-sm font-medium text-sage-deep">
             Capture
           </p>
@@ -89,7 +89,7 @@ export default function Landing() {
             Nothing else to fill in unless you want to.
           </p>
         </div>
-        <div className="rounded-[var(--radius-soft)] bg-surface p-5 shadow-sm">
+        <div className="rounded-soft bg-surface p-5 shadow-sm">
           <p className="font-display text-sm font-medium text-sage-deep">
             One timeline
           </p>

@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Bookmark } from "lucide-react";
 import { toLocalISODate } from "@/lib/dateUtils";
 import {
   useSmartSuggestions,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/hooks/useSmartSuggestions";
 import type { CustomCategory } from "@/lib/hooks/useCategories";
 import type { Category, Entry, EntryType } from "@/lib/hooks/useEntries";
+import type { Template } from "@/lib/hooks/useTemplates";
 
 type QuickAddFormProps = {
   type: EntryType;
@@ -30,6 +31,8 @@ type QuickAddFormProps = {
   canSubmit: boolean;
   onSubmit: () => void;
   entries: Entry[];
+  templates: Template[];
+  onSelectTemplate: (template: Template) => void;
   autoFocus?: boolean;
 };
 
@@ -52,6 +55,8 @@ export default function QuickAddForm({
   canSubmit,
   onSubmit,
   entries,
+  templates,
+  onSelectTemplate,
   autoFocus = false,
 }: QuickAddFormProps) {
   const [todayISO] = useState(() => toLocalISODate(new Date()));
@@ -124,7 +129,23 @@ export default function QuickAddForm({
   }
 
   return (
-    <div className="rounded-[var(--radius-soft)] bg-surface p-4 shadow-sm">
+    <div className="rounded-soft bg-surface p-4 shadow-sm">
+      {templates.length > 0 && (
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
+          {templates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => onSelectTemplate(template)}
+              className="flex items-center gap-1 rounded-full bg-bg px-2.5 py-1 text-xs font-medium text-brown/70 transition-colors hover:bg-sage/15 hover:text-sage-deep"
+            >
+              <Bookmark size={11} className="text-brown/40" />
+              {template.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="mb-2.5 flex gap-2">
         <button
           onClick={() => onTypeChange("expense")}

@@ -16,10 +16,15 @@ function formatIDRShort(amount: number) {
 // of disappearing entirely next to the highest category.
 const MIN_BAR_PERCENT = 4;
 
-export default function CategoryChart({ data }: { data: CategoryTotal[] }) {
+type CategoryChartProps = {
+  data: CategoryTotal[];
+  budgets?: Record<string, number>;
+};
+
+export default function CategoryChart({ data, budgets }: CategoryChartProps) {
   if (data.length === 0) {
     return (
-      <div className="flex h-full flex-col justify-center rounded-[var(--radius-soft)] bg-surface p-4 shadow-sm">
+      <div className="flex h-full flex-col justify-center rounded-soft bg-surface p-4 shadow-sm">
         <p className="font-display text-sm text-brown/50">
           Log an expense to see your breakdown here.
         </p>
@@ -30,7 +35,7 @@ export default function CategoryChart({ data }: { data: CategoryTotal[] }) {
   const maxTotal = Math.max(...data.map((d) => d.total));
 
   return (
-    <div className="flex h-full flex-col rounded-[var(--radius-soft)] bg-surface p-4 shadow-sm">
+    <div className="flex h-full flex-col rounded-soft bg-surface p-4 shadow-sm">
       <p className="mb-3 font-display text-sm font-medium text-sage-deep">
         By category
       </p>
@@ -41,6 +46,8 @@ export default function CategoryChart({ data }: { data: CategoryTotal[] }) {
       <ul className="flex flex-1 flex-col justify-between gap-2.5">
         {data.map((d) => {
           const isMax = d.total === maxTotal;
+          const budget = budgets?.[d.category];
+          const isOverBudget = budget !== undefined && d.total > budget;
           const percent = Math.max(
             MIN_BAR_PERCENT,
             Math.round((d.total / maxTotal) * 100),
@@ -57,7 +64,11 @@ export default function CategoryChart({ data }: { data: CategoryTotal[] }) {
               >
                 {d.category}
               </span>
-              <div className="h-4 w-full overflow-hidden rounded-full bg-bg">
+              <div
+                className={`h-4 w-full overflow-hidden rounded-full bg-bg ${
+                  isOverBudget ? "ring-1 ring-clay/50" : ""
+                }`}
+              >
                 <div
                   className="h-full rounded-full transition-[width]"
                   style={{
@@ -68,8 +79,17 @@ export default function CategoryChart({ data }: { data: CategoryTotal[] }) {
               </div>
               <span
                 className={`text-right text-xs font-medium ${
-                  isMax ? "text-brown" : "text-brown/80"
+                  isOverBudget
+                    ? "text-clay"
+                    : isMax
+                      ? "text-brown"
+                      : "text-brown/80"
                 }`}
+                title={
+                  isOverBudget
+                    ? `Over budget (Rp ${formatIDRShort(budget!)} limit)`
+                    : undefined
+                }
               >
                 Rp {formatIDRShort(d.total)}
               </span>

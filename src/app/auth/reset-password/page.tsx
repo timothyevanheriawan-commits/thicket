@@ -69,7 +69,7 @@ export default function ResetPasswordPage() {
   if (!hasSession) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-5">
-        <div className="w-full max-w-sm rounded-[var(--radius-soft)] bg-surface p-6 text-center shadow-sm">
+        <div className="w-full max-w-sm rounded-soft bg-surface p-6 text-center shadow-sm">
           <h1 className="font-display text-2xl font-medium text-sage-deep">
             Link expired
           </h1>
@@ -90,7 +90,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-5">
-      <div className="w-full max-w-sm rounded-[var(--radius-soft)] bg-surface p-6 shadow-sm">
+      <div className="w-full max-w-sm rounded-soft bg-surface p-6 shadow-sm">
         <h1 className="font-display text-2xl font-medium text-sage-deep">
           Reset password
         </h1>

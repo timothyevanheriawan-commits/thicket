@@ -15,6 +15,8 @@ import {
   X,
   Copy,
   Pin,
+  Bookmark,
+  CloudOff,
   MoreHorizontal,
 } from "lucide-react";
 import {
@@ -47,6 +49,7 @@ type EntryRowProps = {
   onToggleTask: () => void;
   onTogglePin: () => void;
   onDuplicate: () => void;
+  onSaveAsTemplate: () => void;
   // Fired when the user swipes the row past the delete threshold on
   // mobile. Deliberately separate from onConfirmDelete — that prop belongs
   // to the tap-to-confirm flow (isConfirmingDelete), which likely tracks
@@ -102,6 +105,7 @@ export default function EntryRow({
   onToggleTask,
   onTogglePin,
   onDuplicate,
+  onSaveAsTemplate,
   onSwipeDelete,
 }: EntryRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -290,6 +294,15 @@ export default function EntryRow({
               {entry.label}
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              {entry.pending && (
+                <span
+                  className="flex items-center gap-1 rounded-full bg-clay/15 px-1.5 py-0.5 text-[11px] font-medium leading-none text-clay"
+                  title="Saved on this device — will sync once you're back online"
+                >
+                  <CloudOff size={10} />
+                  Not synced
+                </span>
+              )}
               {entry.category && (
                 <span className="rounded-full bg-sage/15 px-1.5 py-0.5 text-[11px] font-medium leading-none text-sage-deep">
                   {entry.category}
@@ -338,6 +351,13 @@ export default function EntryRow({
               className="rounded-full p-2.5 text-brown/45 transition-colors hover:bg-bg hover:text-brown/70"
             >
               <Copy size={13} />
+            </button>
+            <button
+              onClick={onSaveAsTemplate}
+              aria-label="Save as template"
+              className="rounded-full p-2.5 text-brown/45 transition-colors hover:bg-bg hover:text-brown/70"
+            >
+              <Bookmark size={13} />
             </button>
             <button
               onClick={onStartEdit}
@@ -404,6 +424,14 @@ export default function EntryRow({
                   >
                     <Copy size={15} className="text-brown/45" />
                     Duplicate
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => runAndClose(onSaveAsTemplate)}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+                  >
+                    <Bookmark size={15} className="text-brown/45" />
+                    Save as template
                   </button>
                   <button
                     role="menuitem"

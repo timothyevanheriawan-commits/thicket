@@ -50,9 +50,7 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -95,7 +93,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 420, damping: 30 }}
-              className={`pointer-events-auto flex w-full max-w-sm items-center justify-between gap-3 rounded-[var(--radius-soft)] px-4 py-2.5 text-sm shadow-md ${
+              className={`pointer-events-auto flex w-full max-w-sm items-center justify-between gap-3 rounded-soft px-4 py-2.5 text-sm shadow-md ${
                 t.variant === "error"
                   ? "bg-clay text-bg"
                   : t.variant === "success"

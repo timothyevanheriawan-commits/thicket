@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  enqueueOfflineEntry,
+  getOfflineQueue,
+  removeFromOfflineQueue,
+  type QueuedEntry,
+} from "@/lib/offlineQueue";
 
 // Grace period before a deleted entry is actually removed from Supabase.
 // Undo is only possible within this window. Keep this in sync with the
@@ -29,6 +35,10 @@ export type Entry = {
   createdAt: Date;
   dueDate?: Date;
   pinned?: boolean;
+  // True for an entry that only exists in the local offline queue —
+  // never synced to Supabase yet. `id` for a pending entry is the same
+  // `localId` used to track it in the queue, since it has no server row.
+  pending?: boolean;
 };
 
 type EntryRow = {
@@ -57,6 +67,20 @@ function rowToEntry(row: EntryRow): Entry {
   };
 }
 
+function queuedToEntry(item: QueuedEntry): Entry {
+  return {
+    id: item.localId,
+    type: item.input.type,
+    label: item.input.label,
+    amount: item.input.amount,
+    category: item.input.category as Category | undefined,
+    done: item.input.type === "task" ? false : undefined,
+    createdAt: new Date(item.createdAt),
+    dueDate: item.input.dueDate ? new Date(item.input.dueDate) : undefined,
+    pending: true,
+  };
+}
+
 export function useEntries() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +96,63 @@ export function useEntries() {
       { entry: Entry; index: number; timeoutId: ReturnType<typeof setTimeout> }
     >
   >(new Map());
+
+  // Retries every entry currently sitting in the local offline queue.
+  // Runs once on mount (after the initial load effect above has had a
+  // chance to seed the feed) and again on every browser 'online' event.
+  // Stops at the first failure in a pass rather than trying every
+  // remaining item — if one insert fails because the connection is still
+  // down, the rest will fail identically, so there's no point burning
+  // more failed requests; the next 'online' event will retry the whole
+  // queue anyway.
+  const flushOfflineQueue = useCallback(async () => {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    for (const item of queue) {
+      try {
+        const { data, error } = await supabase
+          .from("entries")
+          .insert({
+            user_id: user.id,
+            type: item.input.type,
+            label: item.input.label,
+            amount: item.input.amount ?? null,
+            category: item.input.category ?? null,
+            done: item.input.type === "task" ? false : null,
+            due_date: item.input.dueDate ?? null,
+          })
+          .select()
+          .single();
+
+        if (error || !data) {
+          // A genuine (non-network) rejection — e.g. the row now fails a
+          // constraint. Drop it from the queue rather than retrying
+          // forever, but surface the error instead of silently losing it.
+          removeFromOfflineQueue(item.localId);
+          setEntries((prev) => prev.filter((e) => e.id !== item.localId));
+          setError(error?.message ?? "Failed to sync an offline entry");
+          continue;
+        }
+
+        const finalEntry = rowToEntry(data as EntryRow);
+        removeFromOfflineQueue(item.localId);
+        setEntries((prev) =>
+          prev.map((e) => (e.id === item.localId ? finalEntry : e)),
+        );
+      } catch {
+        // Thrown, not returned — almost always still offline. Leave the
+        // rest of the queue untouched for the next 'online' event.
+        break;
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -98,20 +179,49 @@ export function useEntries() {
 
       if (cancelled) return;
 
+      // Anything still sitting in the offline queue from a previous
+      // session (page reload while offline, browser closed before
+      // reconnecting) needs to show up in the feed immediately — the
+      // person shouldn't have to wonder if what they typed offline
+      // actually "took". flushQueue (below) will attempt to sync these
+      // once this initial load finishes.
+      const queuedEntries = getOfflineQueue().map(queuedToEntry);
+
       if (error) {
         setError(error.message);
+        setEntries(queuedEntries);
       } else {
-        setEntries((data as EntryRow[]).map(rowToEntry));
+        setEntries([...queuedEntries, ...(data as EntryRow[]).map(rowToEntry)]);
         setError(null);
       }
       setLoading(false);
+
+      // Attempt to sync anything left over from a previous offline
+      // session now that the feed has been seeded — deliberately called
+      // from inside this same async function (not a separate effect
+      // reacting to a `loading` dependency) so the entries state update
+      // above has already landed before flushOfflineQueue's own state
+      // updates try to match against it.
+      flushOfflineQueue();
     }
 
     load();
     return () => {
       cancelled = true;
     };
+    // flushOfflineQueue is stable (empty dep array below) for the
+    // lifetime of this hook instance, so omitting it here doesn't risk a
+    // stale closure — including it would just re-run this mount effect
+    // on every render for no benefit, since useCallback identity is the
+    // only thing that could change it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+  useEffect(() => {
+    window.addEventListener("online", flushOfflineQueue);
+    return () => window.removeEventListener("online", flushOfflineQueue);
+  }, [flushOfflineQueue]);
 
   const addEntry = useCallback(
     async (input: {
@@ -128,48 +238,87 @@ export function useEntries() {
       if (!user) return null;
 
       const optimisticId = crypto.randomUUID();
-      setEntries((prev) => [
-        {
-          id: optimisticId,
+      const optimisticEntry: Entry = {
+        id: optimisticId,
+        type: input.type,
+        label: input.label,
+        amount: input.amount,
+        category: input.category,
+        done: input.type === "task" ? false : undefined,
+        createdAt: new Date(),
+        dueDate: input.type === "task" ? input.dueDate : undefined,
+      };
+
+      const queuedItem: QueuedEntry = {
+        localId: optimisticId,
+        input: {
           type: input.type,
           label: input.label,
           amount: input.amount,
           category: input.category,
-          done: input.type === "task" ? false : undefined,
-          createdAt: new Date(),
-          dueDate: input.type === "task" ? input.dueDate : undefined,
-        },
-        ...prev,
-      ]);
-
-      const { data, error } = await supabase
-        .from("entries")
-        .insert({
-          user_id: user.id,
-          type: input.type,
-          label: input.label,
-          amount: input.amount ?? null,
-          category: input.category ?? null,
-          done: input.type === "task" ? false : null,
-          due_date:
+          dueDate:
             input.type === "task" && input.dueDate
               ? input.dueDate.toISOString()
-              : null,
-        })
-        .select()
-        .single();
+              : undefined,
+        },
+        createdAt: optimisticEntry.createdAt.toISOString(),
+      };
 
-      if (error || !data) {
-        setEntries((prev) => prev.filter((e) => e.id !== optimisticId));
-        setError(error?.message ?? "Failed to add entry");
-        return null;
+      // Proactively offline: skip the network attempt entirely rather
+      // than waiting for a fetch to fail. Queue immediately so the entry
+      // survives a reload even if the person closes the tab before
+      // reconnecting.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setEntries((prev) => [{ ...optimisticEntry, pending: true }, ...prev]);
+        enqueueOfflineEntry(queuedItem);
+        return optimisticEntry;
       }
 
-      const finalEntry = rowToEntry(data as EntryRow);
-      setEntries((prev) =>
-        prev.map((e) => (e.id === optimisticId ? finalEntry : e)),
-      );
-      return finalEntry;
+      setEntries((prev) => [optimisticEntry, ...prev]);
+
+      try {
+        const { data, error } = await supabase
+          .from("entries")
+          .insert({
+            user_id: user.id,
+            type: input.type,
+            label: input.label,
+            amount: input.amount ?? null,
+            category: input.category ?? null,
+            done: input.type === "task" ? false : null,
+            due_date:
+              input.type === "task" && input.dueDate
+                ? input.dueDate.toISOString()
+                : null,
+          })
+          .select()
+          .single();
+
+        if (error || !data) {
+          setEntries((prev) => prev.filter((e) => e.id !== optimisticId));
+          setError(error?.message ?? "Failed to add entry");
+          return null;
+        }
+
+        const finalEntry = rowToEntry(data as EntryRow);
+        setEntries((prev) =>
+          prev.map((e) => (e.id === optimisticId ? finalEntry : e)),
+        );
+        return finalEntry;
+      } catch {
+        // The insert call itself threw rather than returning an error —
+        // this is what a mid-request connection drop looks like (fetch
+        // rejects), as opposed to a server-side rejection (which comes
+        // back as `error` above). Treat it the same as the proactive
+        // offline path: queue it instead of discarding what was typed.
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.id === optimisticId ? { ...e, pending: true } : e,
+          ),
+        );
+        enqueueOfflineEntry(queuedItem);
+        return optimisticEntry;
+      }
     },
     [],
   );

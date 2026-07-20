@@ -18,6 +18,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useCategories } from "@/lib/hooks/useCategories";
 import { useCurrencyFormat } from "@/lib/hooks/useCurrencyFormat";
+import { useBudgets } from "@/lib/hooks/useBudgets";
+import { useTemplates, type Template } from "@/lib/hooks/useTemplates";
 import {
   useEntries,
   type Category,
@@ -49,6 +51,8 @@ export default function HomeDashboard() {
   } = useCategories();
 
   const { format: currencyFormat } = useCurrencyFormat();
+  const { weeklyBudget, categoryBudgets } = useBudgets();
+  const { templates, addTemplate } = useTemplates();
 
   const [type, setType] = useState<EntryType>("expense");
   const [category, setCategory] = useState<Category>("Food");
@@ -127,6 +131,17 @@ export default function HomeDashboard() {
   // the text content imperatively on every animation frame without
   // triggering a React re-render. Standard 420/30 spring preset, same as
   // everywhere else in the app.
+  // Soft budget nudge: only meaningful once a weekly budget is actually
+  // set. Progress is clamped for the bar's width, but the raw (unclamped)
+  // percent is what actually decides the over-budget color, so a bar that
+  // visually looks "full" at 100% still correctly flags anything past it.
+  const weeklyBudgetPercent =
+    weeklyBudget !== null && weeklyBudget > 0
+      ? (weeklyTotal / weeklyBudget) * 100
+      : null;
+  const isOverWeeklyBudget =
+    weeklyBudgetPercent !== null && weeklyBudgetPercent > 100;
+
   const weeklyTotalMotion = useMotionValue(0);
   const weeklyTotalDisplay = useTransform(weeklyTotalMotion, (v) =>
     formatIDR(Math.round(v), currencyFormat),
@@ -220,22 +235,67 @@ export default function HomeDashboard() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function saveEntryAsTemplate(entry: Entry) {
+    addTemplate({
+      label: entry.label,
+      type: entry.type,
+      amount: entry.amount,
+      category: entry.category,
+    });
+  }
+
+  // Prefills the form from a saved template — same "fill, don't submit"
+  // behavior as duplicateToForm, so the amount can still be double-checked
+  // (a subscription price can drift) before it actually gets logged.
+  function selectTemplate(template: Template) {
+    setType(template.type);
+    setLabel(template.label);
+    if (template.type === "expense") {
+      setAmount(template.amount !== undefined ? String(template.amount) : "");
+      if (template.category) setCategory(template.category);
+    } else {
+      setAmount("");
+    }
+    setIsAddOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-5 pb-24 pt-8">
       {/* Header */}
-      <header className="mb-6 flex items-start justify-between">
+      <header className="mb-8 flex items-start justify-between">
         <div>
           {displayName && (
-            <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-brown/40">
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-brown/40">
               Welcome back, {displayName}
             </p>
           )}
-          <h1 className="font-display text-3xl font-medium tracking-tight text-sage-deep">
+          <h1 className="relative inline-block font-display text-3xl font-medium italic tracking-tight text-sage-deep">
             Thicket
+            <svg
+              viewBox="0 0 90 10"
+              className="absolute -bottom-2 left-0 h-2.5 w-[90%]"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 6 C 20 2, 35 9, 50 5 S 78 2, 88 6"
+                fill="none"
+                stroke="var(--clay)"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </h1>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-brown/60">
+          <p className="mt-3.5 flex items-center gap-1.5 text-sm text-brown/60">
             <span>
-              This week &middot; <motion.span>{weeklyTotalDisplay}</motion.span>{" "}
+              This week &middot;{" "}
+              <motion.span
+                className={
+                  isOverWeeklyBudget ? "font-medium text-clay" : undefined
+                }
+              >
+                {weeklyTotalDisplay}
+              </motion.span>{" "}
               spent
             </span>
             {weeklyDeltaPercent !== null && weeklyDeltaPercent !== 0 && (
@@ -253,6 +313,25 @@ export default function HomeDashboard() {
               </span>
             )}
           </p>
+          {weeklyBudgetPercent !== null && (
+            <div
+              className="mt-2.5 h-1 w-full max-w-40 overflow-hidden rounded-full bg-surface"
+              role="progressbar"
+              aria-label="Weekly budget progress"
+              aria-valuenow={Math.round(Math.min(100, weeklyBudgetPercent))}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <motion.div
+                className={`h-full rounded-full ${
+                  isOverWeeklyBudget ? "bg-clay" : "bg-sage"
+                }`}
+                initial={false}
+                animate={{ width: `${Math.min(100, weeklyBudgetPercent)}%` }}
+                transition={{ type: "spring", stiffness: 420, damping: 30 }}
+              />
+            </div>
+          )}
         </div>
         <Link
           href="/settings"
@@ -327,12 +406,14 @@ export default function HomeDashboard() {
               canSubmit={canSubmit}
               onSubmit={handleAdd}
               entries={entries}
+              templates={templates}
+              onSelectTemplate={selectTemplate}
             />
           </div>
 
           {/* Chart */}
           <div className="order-2 md:col-start-2 md:row-start-1 md:row-span-3">
-            <CategoryChart data={categoryTotals} />
+            <CategoryChart data={categoryTotals} budgets={categoryBudgets} />
           </div>
 
           {/* Task widget */}
@@ -359,6 +440,7 @@ export default function HomeDashboard() {
               onDeleteEntry={deleteEntry}
               onUndoDelete={undoDelete}
               onDuplicate={duplicateToForm}
+              onSaveAsTemplate={saveEntryAsTemplate}
             />
           </div>
         </div>
@@ -389,6 +471,8 @@ export default function HomeDashboard() {
             canSubmit={canSubmit}
             onSubmit={handleAdd}
             entries={entries}
+            templates={templates}
+            onSelectTemplate={selectTemplate}
             autoFocus
           />
         </QuickAddFab>

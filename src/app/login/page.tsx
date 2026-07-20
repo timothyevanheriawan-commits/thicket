@@ -74,7 +74,7 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 30 }}
-          className="rounded-[var(--radius-soft)] bg-surface p-6 shadow-sm"
+          className="rounded-soft bg-surface p-6 shadow-sm"
         >
           <h1 className="font-display text-2xl font-medium text-sage-deep">
             Thicket

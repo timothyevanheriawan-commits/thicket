@@ -83,7 +83,7 @@ export default function QuickAddFab({
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 420, damping: 30 }}
-              className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[var(--radius-soft)] bg-surface p-5 pb-8 shadow-lg"
+              className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-soft bg-surface p-5 pb-8 shadow-lg"
             >
               <div className="mb-3 flex items-center justify-between">
                 <span className="font-display text-lg font-medium text-sage-deep">
