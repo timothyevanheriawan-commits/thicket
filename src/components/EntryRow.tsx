@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   motion,
   AnimatePresence,
@@ -110,6 +117,12 @@ export default function EntryRow({
 }: EntryRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
 
   // Swipe-to-delete: mobile-only (touch), gated on the same breakpoint the
   // rest of this component already uses for mobile vs desktop layout
@@ -134,12 +147,18 @@ export default function EntryRow({
     }
   }
 
-  // Close the mobile "…" menu on outside click or Escape.
+  // Close the mobile "…" menu on outside click or Escape. The menu panel
+  // itself is portaled to document.body (see render below), so it lives
+  // outside menuRef's DOM subtree — both refs need checking here or every
+  // click inside the portaled panel would register as "outside".
   useEffect(() => {
     if (!menuOpen) return;
 
     function handlePointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger = menuRef.current?.contains(target);
+      const insidePanel = menuPanelRef.current?.contains(target);
+      if (!insideTrigger && !insidePanel) {
         setMenuOpen(false);
       }
     }
@@ -152,6 +171,44 @@ export default function EntryRow({
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  // Portaled menus can't rely on CSS (absolute/top-full/right-0) for
+  // placement since they're no longer DOM-nested under the trigger — their
+  // position has to be computed from the trigger's viewport rect instead.
+  // useLayoutEffect (not useEffect) so this runs before paint and the menu
+  // never flashes at (0,0) on open.
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+
+    function updatePosition() {
+      const rect = menuButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      // getBoundingClientRect and position:fixed both use viewport
+      // coordinates, so no scrollY/scrollX offset is needed here.
+      setMenuPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+
+    updatePosition();
+
+    // The row this menu belongs to can scroll out from under a
+    // fixed-position menu (the feed list scrolls, the window doesn't
+    // necessarily). Rather than track every possible scroll container,
+    // just close the menu — it's a transient context menu, not something
+    // that needs to track the trigger while the list moves.
+    function handleScroll() {
+      setMenuOpen(false);
+    }
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [menuOpen]);
 
@@ -246,7 +303,7 @@ export default function EntryRow({
       : null;
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative rounded-xl">
       {isMobile && (
         <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-clay px-5">
           <Trash2 size={18} className="text-bg" />
@@ -378,6 +435,7 @@ export default function EntryRow({
           {/* Mobile: single "…" trigger opening a menu, so tap targets are full-width rows instead of four cramped icons */}
           <div className="relative shrink-0 md:hidden" ref={menuRef}>
             <button
+              ref={menuButtonRef}
               onClick={() => setMenuOpen((open) => !open)}
               aria-label="More actions"
               aria-haspopup="menu"
@@ -391,67 +449,83 @@ export default function EntryRow({
               <MoreHorizontal size={16} />
             </button>
 
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  key="entry-menu"
-                  role="menu"
-                  aria-label="Entry actions"
-                  initial={{ opacity: 0, scale: 0.94, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.94, y: -4 }}
-                  transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                  className="absolute right-0 top-full z-20 mt-1 min-w-[170px] overflow-hidden rounded-xl bg-surface shadow-md ring-1 ring-brown/10"
-                >
-                  {entry.type === "task" && (
-                    <button
-                      role="menuitem"
-                      onClick={() => runAndClose(onTogglePin)}
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+            {typeof document !== "undefined" &&
+              createPortal(
+                <AnimatePresence>
+                  {menuOpen && menuPosition && (
+                    <motion.div
+                      ref={menuPanelRef}
+                      key="entry-menu"
+                      role="menu"
+                      aria-label="Entry actions"
+                      initial={{ opacity: 0, scale: 0.94, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.94, y: -4 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 30,
+                      }}
+                      style={{
+                        position: "fixed",
+                        top: menuPosition.top,
+                        right: menuPosition.right,
+                      }}
+                      className="z-50 min-w-[170px] overflow-hidden rounded-xl bg-surface shadow-md ring-1 ring-brown/10"
                     >
-                      <Pin
-                        size={15}
-                        className={entry.pinned ? "text-clay" : "text-brown/45"}
-                        fill={entry.pinned ? "currentColor" : "none"}
-                      />
-                      {entry.pinned ? "Unpin" : "Pin"}
-                    </button>
+                      {entry.type === "task" && (
+                        <button
+                          role="menuitem"
+                          onClick={() => runAndClose(onTogglePin)}
+                          className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+                        >
+                          <Pin
+                            size={15}
+                            className={
+                              entry.pinned ? "text-clay" : "text-brown/45"
+                            }
+                            fill={entry.pinned ? "currentColor" : "none"}
+                          />
+                          {entry.pinned ? "Unpin" : "Pin"}
+                        </button>
+                      )}
+                      <button
+                        role="menuitem"
+                        onClick={() => runAndClose(onDuplicate)}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+                      >
+                        <Copy size={15} className="text-brown/45" />
+                        Duplicate
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => runAndClose(onSaveAsTemplate)}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+                      >
+                        <Bookmark size={15} className="text-brown/45" />
+                        Save as template
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => runAndClose(onStartEdit)}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
+                      >
+                        <Pencil size={15} className="text-brown/45" />
+                        Edit
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => runAndClose(onStartDelete)}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-clay transition-colors hover:bg-clay/10"
+                      >
+                        <Trash2 size={15} />
+                        Delete
+                      </button>
+                    </motion.div>
                   )}
-                  <button
-                    role="menuitem"
-                    onClick={() => runAndClose(onDuplicate)}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
-                  >
-                    <Copy size={15} className="text-brown/45" />
-                    Duplicate
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => runAndClose(onSaveAsTemplate)}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
-                  >
-                    <Bookmark size={15} className="text-brown/45" />
-                    Save as template
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => runAndClose(onStartEdit)}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-brown transition-colors hover:bg-bg"
-                  >
-                    <Pencil size={15} className="text-brown/45" />
-                    Edit
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => runAndClose(onStartDelete)}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-clay transition-colors hover:bg-clay/10"
-                  >
-                    <Trash2 size={15} />
-                    Delete
-                  </button>
-                </motion.div>
+                </AnimatePresence>,
+                document.body,
               )}
-            </AnimatePresence>
           </div>
         </div>
       </motion.div>
